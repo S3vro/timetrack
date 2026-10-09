@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Inter", system-ui, sans-serif;
+  --color-accent: #0071e3;
+  --color-ios-green: #34c759;
+  --color-ios-red: #ff3b30;
+  --color-ios-orange: #ff9500;
+  --color-ios-teal: #30b0c7;
+  --color-ink: #1d1d1f;
+  --color-muted: #86868b;
+  --color-canvas: #f5f5f7;
+}
+
+:root { color-scheme: light dark; }
+
+@layer base {
+  body {
+    @apply bg-canvas text-ink antialiased dark:bg-black dark:text-[#f5f5f7];
+    font-feature-settings: "tnum" 0;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-[22px] bg-white p-6 dark:bg-[#1c1c1e];
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 28px rgb(0 0 0 / 0.05);
+  }
+  .eyebrow { @apply text-[13px] font-medium text-muted; }
+  .title { @apply text-[28px] font-semibold tracking-tight; }
+
+  .btn {
+    @apply inline-flex cursor-pointer items-center justify-center gap-1 rounded-full px-4 py-2 text-[15px] font-medium
+      transition duration-150 active:scale-[0.97] disabled:opacity-40;
+  }
+  .btn-primary { @apply bg-accent text-white hover:bg-[#0077ed]; }
+  .btn-ghost { @apply bg-black/[0.05] text-accent hover:bg-black/[0.08] dark:bg-white/10 dark:text-[#2997ff] dark:hover:bg-white/15; }
+  .btn-danger { @apply text-ios-red hover:bg-ios-red/10; }
+  .btn-icon { @apply h-8 w-8 rounded-full p-0; }
+
+  .input {
+    @apply rounded-xl border-0 bg-black/[0.04] px-3 py-2 text-[15px] outline-none transition
+      placeholder:text-muted focus:bg-white focus:ring-4 focus:ring-accent/25
+      dark:bg-white/10 dark:focus:bg-white/15;
+  }
+
+  .seg { @apply inline-flex rounded-full bg-black/[0.06] p-1 dark:bg-white/10; }
+  .seg-item { @apply rounded-full px-4 py-1.5 text-[13px] font-medium text-ink/70 transition hover:text-ink dark:text-white/70 dark:hover:text-white; }
+  .seg-active { @apply bg-white !text-ink shadow-sm dark:bg-[#636366] dark:!text-white; }
+
+  .pos { @apply text-ios-green; }
+  .neg { @apply text-ios-red; }
+  .num { font-variant-numeric: tabular-nums; }
+}
