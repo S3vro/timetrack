@@ -1,33 +1,55 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useData } from '../stores/data'
-import { entryDate, entryMinutes } from '../lib/calc'
-import { fmtDuration, minutesBetween, parseDateTime } from '../lib/dates'
-import type { AbsenceType, DateStr } from '../lib/types'
+import { analyzeEntries, entryDate, entryMinutes } from '../lib/calc'
+import { datePart, fmtDuration, minutesBetween, parseDateTime, timePart } from '../lib/dates'
+import type { AbsenceType, DateStr, Entry } from '../lib/types'
+import SessionRow from './SessionRow.vue'
+import DayLocation from './DayLocation.vue'
 
 const props = defineProps<{ date: DateStr; now: Date }>()
 const store = useData()
 
-const entries = computed(() => store.sortedEntries.filter((e) => entryDate(e) === props.date))
-const absence = computed(() => store.data.absences.find((a) => a.date === props.date)?.type ?? '')
+/*
+ * Sessions are shown in chronological order, but the order is frozen while focus is
+ * inside this editor: re-sorting would move a row while you are typing in it (and
+ * moving a focused input in the DOM makes it lose focus). It re-sorts on focus leave.
+ */
+const root = ref<HTMLElement>()
+const frozenOrder = ref<string[] | null>(null)
+const daySessions = computed(() => store.sortedEntries.filter((e) => entryDate(e) === props.date))
+const entries = computed(() => {
+  const order = frozenOrder.value
+  if (!order) return daySessions.value
+  const pos = (e: Entry) => {
+    const i = order.indexOf(e.id)
+    return i === -1 ? order.length : i // sessions added meanwhile go last
+  }
+  return [...daySessions.value].sort((a, b) => pos(a) - pos(b))
+})
+function onFocusIn() {
+  frozenOrder.value ??= daySessions.value.map((e) => e.id)
+}
+function onFocusOut(ev: FocusEvent) {
+  if (!root.value?.contains(ev.relatedTarget as Node | null)) frozenOrder.value = null
+}
 
-/** Break before entry i = gap to previous entry's end */
+const overlapping = computed(() => analyzeEntries(store.data.entries, props.now).overlapping)
+
+/** Break before entry i = positive gap to the previous entry's end */
 function breakBefore(i: number): number | null {
-  if (i === 0) return null
   const prev = entries.value[i - 1]
-  if (!prev.end) return null
-  return minutesBetween(parseDateTime(prev.end), parseDateTime(entries.value[i].start))
+  if (!prev?.end) return null
+  const gap = minutesBetween(parseDateTime(prev.end), parseDateTime(entries.value[i].start))
+  return gap > 0 ? gap : null
 }
 
-const setTime = (id: string, field: 'start' | 'end', v: string) => {
-  if (!v) return
-  store.updateEntry(id, { [field]: `${props.date}T${v}` })
-}
-const invalid = (s: string, e: string | null) => e !== null && e <= s
+const absence = computed(() => store.data.absences.find((a) => a.date === props.date)?.type ?? '')
 
 function addSession() {
   const last = entries.value.at(-1)
-  const start = last?.end?.slice(11) ?? '08:00'
+  // continue at the last end – unless that is on the next day (overnight session)
+  const start = last?.end && datePart(last.end) === props.date ? timePart(last.end) : '08:00'
   store.addEntry({ start: `${props.date}T${start}`, end: `${props.date}T${start}`, note: '' })
 }
 function onAbsence(v: string) {
@@ -36,7 +58,7 @@ function onAbsence(v: string) {
 </script>
 
 <template>
-  <div>
+  <div ref="root" @focusin="onFocusIn" @focusout="onFocusOut">
     <p v-if="!entries.length" class="pb-2 text-[15px] text-muted">No sessions.</p>
     <div class="divide-y divide-black/[0.06] dark:divide-white/10">
       <template v-for="(e, i) in entries" :key="e.id">
@@ -45,22 +67,13 @@ function onAbsence(v: string) {
           ☕ Break {{ fmtDuration(breakBefore(i)!) }}
           <span class="h-px flex-1 border-t border-dashed border-black/10 dark:border-white/15"></span>
         </div>
-        <div class="group flex flex-wrap items-center gap-2 py-2.5" :class="{ 'rounded-xl bg-ios-red/10 px-2': invalid(e.start, e.end) }">
-          <input type="time" class="input num w-[8.75rem]" :value="e.start.slice(11)" @change="setTime(e.id, 'start', ($event.target as HTMLInputElement).value)" />
-          <span class="text-muted">→</span>
-          <input v-if="e.end" type="time" class="input num w-[8.75rem]" :value="e.end.slice(11)" @change="setTime(e.id, 'end', ($event.target as HTMLInputElement).value)" />
-          <span v-else class="flex w-[8.75rem] items-center gap-1.5 px-3 text-[15px] font-medium text-ios-green">
-            <span class="h-2 w-2 animate-pulse rounded-full bg-ios-green"></span>Running
-          </span>
-          <span class="num w-14 text-right text-[15px] font-semibold">{{ fmtDuration(entryMinutes(e, now)) }}</span>
-          <input class="input min-w-0 flex-1 bg-transparent focus:bg-white dark:bg-transparent" placeholder="Add note" :value="e.note" @change="store.updateEntry(e.id, { note: ($event.target as HTMLInputElement).value })" />
-          <button class="btn btn-danger btn-icon opacity-0 transition group-hover:opacity-100" title="Delete" @click="store.deleteEntry(e.id)">✕</button>
-        </div>
+        <SessionRow :entry="e" :minutes="entryMinutes(e, now)" :overlapping="overlapping.has(e.id)" />
       </template>
     </div>
-    <div class="flex items-center gap-3 pt-3">
+    <div class="flex flex-wrap items-center gap-3 pt-3">
       <button class="btn btn-ghost" @click="addSession">＋ Session</button>
-      <select class="input ml-auto" :value="absence" @change="onAbsence(($event.target as HTMLSelectElement).value)">
+      <DayLocation :date="date" />
+      <select class="input ml-auto" :value="absence" aria-label="Absence" @change="onAbsence(($event.target as HTMLSelectElement).value)">
         <option value="">No absence</option>
         <option value="vacation">🏖 Vacation</option>
         <option value="sick">🤒 Sick</option>

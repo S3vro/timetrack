@@ -26,6 +26,7 @@ const links = [
     </div>
   </header>
   <main class="mx-auto max-w-4xl px-6 py-8">
+    <p v-if="store.loadError" class="mb-4 rounded-2xl bg-ios-red/10 p-4 text-[15px] text-ios-red">{{ store.loadError }}</p>
     <p v-if="store.saveError" class="mb-4 rounded-2xl bg-ios-red/10 p-4 text-[15px] text-ios-red">{{ store.saveError }}</p>
     <RouterView v-slot="{ Component }">
       <Transition enter-active-class="transition duration-200" enter-from-class="opacity-0 translate-y-1" mode="out-in">

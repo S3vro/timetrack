@@ -2,19 +2,31 @@
 import { computed, ref } from 'vue'
 import { useData } from '../stores/data'
 import { download, parseBackup } from '../lib/io'
-import { toDateStr } from '../lib/dates'
+import { addDays, toDateStr, weekdayName } from '../lib/dates'
 import { defaultData } from '../lib/types'
 
 const store = useData()
 const s = computed(() => store.data.settings)
 
-const weeklyHours = computed({
-  get: () => s.value.weeklyTargetMin / 60,
-  set: (v: number) => (s.value.weeklyTargetMin = Math.round(v * 60)),
+/** Number field bound to a setting; an empty or invalid entry is ignored instead of saved as 0 */
+function numberSetting(get: () => number, set: (v: number) => void, min = -Infinity) {
+  return computed({
+    get,
+    set: (v: number | string) => {
+      if (typeof v === 'number' && Number.isFinite(v) && v >= min) set(v)
+    },
+  })
+}
+const weeklyHours = numberSetting(() => s.value.weeklyTargetMin / 60, (v) => (s.value.weeklyTargetMin = Math.round(v * 60)), 0)
+const initialHours = numberSetting(() => s.value.initialBalanceMin / 60, (v) => (s.value.initialBalanceMin = Math.round(v * 60)))
+const vacationMin = numberSetting(() => s.value.vacationMinDays, (v) => (s.value.vacationMinDays = Math.round(v)), 0)
+const startDate = computed({
+  get: () => s.value.startDate,
+  set: (v: string) => v && (s.value.startDate = v), // ignore a cleared date field
 })
-const initialHours = computed({
-  get: () => s.value.initialBalanceMin / 60,
-  set: (v: number) => (s.value.initialBalanceMin = Math.round(v * 60)),
+const workdaysLabel = computed(() => {
+  const days = s.value.workdays.map((d) => weekdayName(addDays('2024-01-01', d - 1))) // 2024-01-01 was a Monday
+  return `${days.join(', ')} · daily target = weekly ÷ ${days.length}`
 })
 
 // Pre-fill
@@ -64,13 +76,13 @@ function resetAll() {
         <label class="flex items-center justify-between px-5 py-3.5 text-[15px]">Weekly target (hours)
           <input type="number" step="0.5" class="input num w-28 text-right" v-model.number="weeklyHours" /></label>
         <label class="flex items-center justify-between px-5 py-3.5 text-[15px]">Tracking start date
-          <input type="date" class="input" v-model="s.startDate" /></label>
+          <input type="date" class="input" v-model="startDate" /></label>
         <label class="flex items-center justify-between px-5 py-3.5 text-[15px]">Initial balance carry-over (hours, ±)
           <input type="number" step="0.25" class="input num w-28 text-right" v-model.number="initialHours" /></label>
         <label class="flex items-center justify-between px-5 py-3.5 text-[15px]">Legal minimum vacation (days)
-          <input type="number" class="input num w-28 text-right" v-model.number="s.vacationMinDays" /></label>
+          <input type="number" class="input num w-28 text-right" v-model.number="vacationMin" /></label>
       </div>
-      <p class="eyebrow mt-2 px-4">Mon–Fri · daily target = weekly ÷ 5 · public holidays: Hessen</p>
+      <p class="eyebrow mt-2 px-4">{{ workdaysLabel }} · public holidays: Hessen</p>
     </section>
 
     <section>

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useData } from '../stores/data'
 import { useNow } from '../lib/useNow'
-import { balance, dayRows, vacationDays } from '../lib/calc'
+import { balance, dayRows, homeOfficeDays, vacationDays } from '../lib/calc'
 import { addDays, fmtDuration, mondayOf, toDateStr } from '../lib/dates'
 import DayEditor from '../components/DayEditor.vue'
 import ProgressRing from '../components/ProgressRing.vue'
@@ -25,6 +25,8 @@ const totalBalance = computed(() => yesterdayBalance.value + todayRow.value.diff
 const year = computed(() => now.value.getFullYear())
 const vac = computed(() => vacationDays(store.data, year.value))
 const vacMin = computed(() => store.data.settings.vacationMinDays)
+const vacPercent = computed(() => (vacMin.value > 0 ? Math.min(100, (vac.value / vacMin.value) * 100) : 100))
+const homeDays = computed(() => homeOfficeDays(store.data, year.value, now.value))
 const since = computed(() => store.running?.start.slice(11))
 
 const cls = (m: number) => (m > 0 ? 'pos' : m < 0 ? 'neg' : 'text-muted')
@@ -59,7 +61,7 @@ const cls = (m: number) => (m > 0 ? 'pos' : m < 0 ? 'neg' : 'text-muted')
       </div>
     </section>
 
-    <section class="grid gap-6 sm:grid-cols-3">
+    <section class="grid gap-6 sm:grid-cols-2 md:grid-cols-4">
       <div class="card">
         <p class="eyebrow">This Week</p>
         <p class="num mt-2 text-[28px] font-semibold tracking-tight">{{ fmtDuration(week.worked) }}<span class="text-[17px] font-normal text-muted"> / {{ fmtDuration(week.target) }}</span></p>
@@ -77,10 +79,15 @@ const cls = (m: number) => (m > 0 ? 'pos' : m < 0 ? 'neg' : 'text-muted')
         <p class="eyebrow">Vacation {{ year }}</p>
         <p class="num mt-2 text-[28px] font-semibold tracking-tight">{{ vac }}<span class="text-[17px] font-normal text-muted"> days</span></p>
         <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-black/[0.06] dark:bg-white/10">
-          <div class="h-full rounded-full bg-ios-teal transition-all" :style="{ width: Math.min(100, (vac / vacMin) * 100) + '%' }"></div>
+          <div class="h-full rounded-full bg-ios-teal transition-all" :style="{ width: vacPercent + '%' }"></div>
         </div>
         <p v-if="vac >= vacMin" class="mt-2 text-[13px] font-medium text-ios-green">✓ Legal minimum reached</p>
         <p v-else class="eyebrow mt-2">{{ vacMin - vac }} to legal minimum ({{ vacMin }})</p>
+      </div>
+      <div class="card">
+        <p class="eyebrow">Home office {{ year }}</p>
+        <p class="num mt-2 text-[28px] font-semibold tracking-tight">{{ homeDays }}<span class="text-[17px] font-normal text-muted"> days</span></p>
+        <p class="eyebrow mt-3">Days marked Home with recorded work</p>
       </div>
     </section>
 

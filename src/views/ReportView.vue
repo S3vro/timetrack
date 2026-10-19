@@ -4,6 +4,7 @@ import { useData } from '../stores/data'
 import { dayRows } from '../lib/calc'
 import { addDays, fmtDuration, parseDate, toDateStr } from '../lib/dates'
 import { download, toCsv } from '../lib/io'
+import { LOCATION_LABELS, LOCATION_TYPES, type WorkLocation } from '../lib/types'
 
 const store = useData()
 const month = ref(toDateStr(new Date()).slice(0, 7)) // 'YYYY-MM'
@@ -16,12 +17,20 @@ const monthLabel = computed(() =>
   parseDate(range.value.from).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
 )
 const rows = computed(() =>
-  dayRows(store.data, range.value.from, range.value.to, new Date()).filter((r) => r.worked || r.target || r.absence || r.holiday),
+  dayRows(store.data, range.value.from, range.value.to, new Date()).filter(
+    (r) => r.worked || r.target || r.absence || r.holiday || r.location,
+  ),
 )
 const total = computed(() => ({
   worked: rows.value.reduce((s, r) => s + r.worked, 0),
   target: rows.value.reduce((s, r) => s + r.target, 0),
 }))
+/** Number of days per work location in this month (only days with a location set) */
+const locationCounts = computed(() =>
+  LOCATION_TYPES.map((t) => ({ label: LOCATION_LABELS[t], count: rows.value.filter((r) => r.location?.type === t).length }))
+    .filter((c) => c.count > 0),
+)
+const fmtLocation = (l: WorkLocation) => (l.type === 'client' && l.place ? `Client · ${l.place}` : LOCATION_LABELS[l.type])
 const fmtDay = (s: string) => parseDate(s).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 const cls = (m: number) => (m > 0 ? 'pos' : m < 0 ? 'neg' : 'text-muted')
 
@@ -53,10 +62,14 @@ function exportAll() {
       <div class="card"><p class="eyebrow">Difference</p><p class="num mt-2 text-[28px] font-semibold tracking-tight" :class="cls(total.worked - total.target)">{{ fmtDuration(total.worked - total.target, true) }}</p></div>
     </section>
 
-    <section class="card p-2">
+    <p v-if="locationCounts.length" class="eyebrow px-1">
+      Work location: <span v-for="(c, i) in locationCounts" :key="c.label">{{ i ? ' · ' : '' }}{{ c.label }} {{ c.count }}</span>
+    </p>
+
+    <section class="card overflow-x-auto p-2">
       <table class="num w-full text-[15px]">
         <thead class="text-left text-[13px] text-muted">
-          <tr><th class="px-4 py-3 font-medium">Day</th><th class="font-medium"></th><th class="text-right font-medium">Worked</th><th class="text-right font-medium">Target</th><th class="px-4 text-right font-medium">Diff</th></tr>
+          <tr><th class="px-4 py-3 font-medium">Day</th><th class="font-medium"></th><th class="font-medium">Location</th><th class="text-right font-medium">Worked</th><th class="text-right font-medium">Target</th><th class="px-4 text-right font-medium">Diff</th></tr>
         </thead>
         <tbody class="divide-y divide-black/[0.06] dark:divide-white/10">
           <tr v-for="r in rows" :key="r.date">
@@ -65,11 +78,12 @@ function exportAll() {
               <span v-if="r.holiday" class="rounded-full bg-ios-orange/15 px-2.5 py-0.5 text-[12px] font-medium text-ios-orange">{{ r.holiday }}</span>
               <span v-else-if="r.absence" class="rounded-full bg-ios-teal/15 px-2.5 py-0.5 text-[12px] font-medium capitalize text-ios-teal">{{ r.absence.type }}</span>
             </td>
+            <td class="text-[13px] text-muted">{{ r.location ? fmtLocation(r.location) : '' }}</td>
             <td class="text-right">{{ fmtDuration(r.worked) }}</td>
             <td class="text-right text-muted">{{ fmtDuration(r.target) }}</td>
             <td class="px-4 text-right font-medium" :class="cls(r.diff)">{{ fmtDuration(r.diff, true) }}</td>
           </tr>
-          <tr v-if="!rows.length"><td colspan="5" class="px-4 py-6 text-center text-muted">No data for this month.</td></tr>
+          <tr v-if="!rows.length"><td colspan="6" class="px-4 py-6 text-center text-muted">No data for this month.</td></tr>
         </tbody>
       </table>
     </section>

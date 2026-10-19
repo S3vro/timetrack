@@ -46,6 +46,15 @@ export function eachDay(from: DateStr, to: DateStr): DateStr[] {
 
 export const minutesBetween = (a: Date, b: Date) => Math.round((b.getTime() - a.getTime()) / 60000)
 
+/** Calendar days from a to b (DST-safe: 23/25 h days round to 1) */
+export const daysBetween = (a: DateStr, b: DateStr) =>
+  Math.round((parseDate(b).getTime() - parseDate(a).getTime()) / 86_400_000)
+
+/** 'YYYY-MM-DDTHH:mm' -> 'YYYY-MM-DD' */
+export const datePart = (s: DateTimeStr): DateStr => s.slice(0, 10)
+/** 'YYYY-MM-DDTHH:mm' -> 'HH:mm' */
+export const timePart = (s: DateTimeStr): string => s.slice(11, 16)
+
 /** 125 -> '2:05', -30 -> '-0:30' */
 export function fmtDuration(min: number, signed = false): string {
   const sign = min < 0 ? '-' : signed && min > 0 ? '+' : ''
